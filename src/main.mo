@@ -1,17 +1,18 @@
 import Principal "mo:base/Principal";
 import Time "mo:base/Time";
 import Timer "mo:base/Timer";
-import Text "mo:base/Text";
-shared ({ caller = creator }) actor class UserCanister(
-    yourName : Text
-) = this {
+
+shared ({ caller = creator }) actor class UserCanister() = this {
 
     public type Mood = Text;
     public type Name = Text;
 
-    let name : Name = yourName;
+
+    stable let born : Time.Time = Time.now();
+
+    let name : Name = "alex";
     let owner : Principal = creator;
-    let nanosecondsPerDay = 24 * 60 * 60 * 1_000_000_000;
+    let nanosecondsPerDay: Nat = 24 * 60 * 60 * 1_000_000_000;
 
     let board = actor ("q3gy3-sqaaa-aaaas-aaajq-cai") : actor {
         reboot_writeDailyCheck : (name : Name, mood : Mood) -> async ();
@@ -46,8 +47,26 @@ shared ({ caller = creator }) actor class UserCanister(
         };
     };
 
+
     public query func reboot_isAlive() : async Bool {
         return alive;
+    };
+
+    public query func reboot_getName() : async Name {
+        return name;
+    };
+
+    public query func reboot_getOwner() : async Principal {
+        return owner;
+    };
+
+    public query func reboot_getBorn() : async Int {
+        return born;
+    };
+
+
+    public query func reboot_getAge() : async Int {
+        return Time.now() -  born;
     };
 
 };
