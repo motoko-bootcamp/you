@@ -10,8 +10,8 @@ shared ({ caller = creator }) actor class UserCanister() = this {
     let owner : Principal = creator;
     let nanosecondsPerDay = 24 * 60 * 60 * 1_000_000_000;
 
-    let board = actor ("pqmgt-myaaa-aaaaj-qa37q-cai") : actor {
-        writeDailyCheck : (name : Name, mood : Mood) -> async ();
+    let board = actor ("q3gy3-sqaaa-aaaas-aaajq-cai") : actor {
+        reboot_writeDailyCheck : (name : Name, mood : Mood) -> async ();
     };
 
     stable var alive : Bool = true;
@@ -37,7 +37,7 @@ shared ({ caller = creator }) actor class UserCanister() = this {
 
         // Write the daily check to the board
         try {
-            await board.writeDailyCheck(name, mood);
+            await board.reboot_writeDailyCheck(name, mood);
         } catch (e) {
             throw e;
         };

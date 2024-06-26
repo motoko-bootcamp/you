@@ -1,0 +1,7 @@
+type UserCanister = 
+ service {
+   reboot_dailyCheck: (Mood) -> ();
+   reboot_isAlive: () -> (bool) query;
+ };
+type Mood = text;
+service : () -> UserCanister

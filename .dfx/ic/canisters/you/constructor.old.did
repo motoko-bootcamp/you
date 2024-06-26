@@ -1,0 +1,5 @@
+type Mood = text;
+service : {
+  reboot_dailyCheck: (Mood) -> ();
+  reboot_isAlive: () -> (bool) query;
+}
