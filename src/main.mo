@@ -1,6 +1,7 @@
 import Principal "mo:base/Principal";
 import Time "mo:base/Time";
 import Timer "mo:base/Timer";
+import Text "mo:base/Text";
 
 shared ({ caller = creator }) actor class UserCanister(
     yourName : Text
