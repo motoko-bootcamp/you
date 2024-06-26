@@ -8,7 +8,7 @@ shared ({ caller = creator }) actor class UserCanister() = this {
     public type Name = Text;
 
 
-    stable let born : Time.Time = Time.now();
+    stable let birth : Time.Time = Time.now();
 
     let name : Name = "alex";
     let owner : Principal = creator;
@@ -60,13 +60,13 @@ shared ({ caller = creator }) actor class UserCanister() = this {
         return owner;
     };
 
-    public query func reboot_getBorn() : async Int {
-        return born;
+    public query func reboot_getBirth() : async Int {
+        return birth;
     };
 
 
     public query func reboot_getAge() : async Int {
-        return Time.now() -  born;
+        return Time.now() - birth;
     };
 
 };
