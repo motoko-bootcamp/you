@@ -1,7 +1,7 @@
 {
     "canisters": {
         "you" : {
-            "main" : "src/user/main.mo",
+            "main" : "src/main.mo",
             "type" : "motoko"
         }
     }
