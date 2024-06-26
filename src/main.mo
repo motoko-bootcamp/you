@@ -2,7 +2,9 @@ import Principal "mo:base/Principal";
 import Time "mo:base/Time";
 import Timer "mo:base/Timer";
 
-shared ({ caller = creator }) actor class UserCanister() = this {
+shared ({ caller = creator }) actor class UserCanister(
+    yourName : Text
+) = this {
 
     public type Mood = Text;
     public type Name = Text;
@@ -10,7 +12,7 @@ shared ({ caller = creator }) actor class UserCanister() = this {
 
     stable let birth : Time.Time = Time.now();
 
-    let name : Name = "alex";
+    let name : Name = yourName;
     let owner : Principal = creator;
     let nanosecondsPerDay: Nat = 24 * 60 * 60 * 1_000_000_000;
 
