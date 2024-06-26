@@ -9,6 +9,8 @@ shared ({ caller = creator }) actor class UserCanister(
     public type Mood = Text;
     public type Name = Text;
 
+    stable let birth : Time.Time = Time.now();
+
     let name : Name = yourName;
     let owner : Principal = creator;
     let nanosecondsPerDay = 24 * 60 * 60 * 1_000_000_000;
@@ -46,8 +48,26 @@ shared ({ caller = creator }) actor class UserCanister(
         };
     };
 
+
     public query func reboot_isAlive() : async Bool {
         return alive;
+    };
+
+    public query func reboot_getName() : async Name {
+        return name;
+    };
+
+    public query func reboot_getOwner() : async Principal {
+        return owner;
+    };
+
+    public query func reboot_getBirth() : async Int {
+        return birth;
+    };
+
+
+    public query func reboot_getAge() : async Int {
+        return Time.now() - birth;
     };
 
 };
