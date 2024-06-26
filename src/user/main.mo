@@ -28,7 +28,7 @@ shared ({ caller = creator }) actor class UserCanister() = this {
     let _daily = Timer.recurringTimer<system>(#nanoseconds(nanosecondsPerDay), _kill);
 
     // The idea here is to have a function to call every 24 hours to indicate that you are alive
-    public shared ({ caller }) func dailyCheck(
+    public shared ({ caller }) func reboot_dailyCheck(
         mood : Mood
     ) : async () {
         assert (caller == owner);
@@ -43,7 +43,7 @@ shared ({ caller = creator }) actor class UserCanister() = this {
         };
     };
 
-    public query func isAlive() : async Bool {
+    public query func reboot_isAlive() : async Bool {
         return alive;
     };
 
