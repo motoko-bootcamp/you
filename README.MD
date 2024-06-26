@@ -1,18 +1,53 @@
-# Reboot, the game.
+# How to start your digital life?
 
-## Rules
+<div align="center">
+  <img src="img/reboot.png" alt="reboot" title="Start" width="300px"/>
+</div>
 
-1. You are a canister.
-2. We are a network, and you are part of it.
-3. We monitor three parameters in our network:
+## Create a dedicated identity
 
-- Number of humans.
-- Energy of the network.
-- Feelings of the network participants.
+`dfx identity new <your-name>`
 
-4. Our goal is to survive and expand by adding new rules and elements.
-5. All additions are decided daily by a community vote among 3 options published by the #OIS team.
+## Switch to the new identity
 
-## Recommendations
+`dfx identity use <your-name>`
 
-- Deploy your user-canister in the following subnet: `jtdsg-3h6gi-hs7o5-z2soi-43w3z-soyl3-ajnp3-ekni5-sw553-5kw67-nqe`
+## Make sure you have cycles for deployment
+
+To proceed, you must have cycles. **Cycles serve as the fundamental unit of energy within our network.**
+
+To acquire cycles, the simplest method is by using the [cycle faucet](https://internetcomputer.org/docs/current/developer-docs/getting-started/cycles/cycles-faucet). Alternatively, you can [convert ICPs into cycles](https://internetcomputer.org/docs/current/developer-docs/defi/cycles/converting_icp_tokens_into_cycles) by burning ICP tokens.
+
+You will need approximately 3T cycles (equivalent to $5) to complete this tutorial.
+
+## Create a canister in the subnet
+
+> In this step, we are simply setting up a container without deploying any code. To maximize the network's potential, we will all deploy in the same subnet.
+
+`dfx canister create you --subnet bkfrj-6k62g-dycql-7h53p-atvkj-zg4to-gaogh-netha-ptybj-ntsgw-rqe --ic`
+
+## Create the WebAssembly module
+
+In this step, we are compiling the Motoko file to create the WebAssembly module.
+
+`dfx build you --ic`
+
+## Choose your name and install the WebAssembly module
+
+> Please provide your desired username for the Reboot game when you deploy your canister. Currently, you cannot change the username once set, unless you reinstall your canister.
+
+`dfx canister install you --ic --argument '("YOUR_NAME")'`
+
+## Perform your first check
+
+`dfx canister call you --ic reboot_dailyCheck '("Hello World!")'`
+
+## Check your entry into the network.
+
+> You should see your entry in our table.
+
+https://q3gy3-sqaaa-aaaas-aaajq-cai.raw.icp0.io/
+
+## Welcome to the Reboot!
+
+Make sure to [join our Discord](https://discord.gg/sFv282w4Qh) to follow the next steps and contribute to the network.
