@@ -2,7 +2,6 @@ import Principal "mo:base/Principal";
 import Time "mo:base/Time";
 import Timer "mo:base/Timer";
 import Text "mo:base/Text";
-
 shared ({ caller = creator }) actor class UserCanister(
     yourName : Text
 ) = this {
@@ -10,12 +9,11 @@ shared ({ caller = creator }) actor class UserCanister(
     public type Mood = Text;
     public type Name = Text;
 
-
     stable let birth : Time.Time = Time.now();
 
     let name : Name = yourName;
     let owner : Principal = creator;
-    let nanosecondsPerDay: Nat = 24 * 60 * 60 * 1_000_000_000;
+    let nanosecondsPerDay = 24 * 60 * 60 * 1_000_000_000;
 
     let board = actor ("q3gy3-sqaaa-aaaas-aaajq-cai") : actor {
         reboot_writeDailyCheck : (name : Name, mood : Mood) -> async ();
