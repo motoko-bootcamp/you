@@ -1,23 +1,41 @@
-# Tutorial: How to start your digital life?
+# How to start your digital life?
 
-## Step 1: Create your identity (dfx)
+<div align="center">
+  <img src="img/reboot.png" alt="reboot" title="Start" width="300px"/>
+</div>
 
-## Step 2: Send ICPs to your identity (Optional)
+## Create a dedicated identity
 
-## Step 3: Replace the name variable by your name
+`dfx identity new <your-name>`
 
-- In `main.mo` replace the `name` variable by the name you want to have in Reboot.
+## Switch to the new identity
 
-## Step 4: Create the canister (on the European subnet)
+`dfx identity use <your-name>`
 
-`dfx canister create you --subnet bkfrj-6k62g-dycql-7h53p-atvkj-zg4to-gaogh-netha-ptybj-ntsgw-rqe --network ic --with-cycles 1_000_000_000_000`
+## Make sure you have cycles for deployment
 
-## Step 5: Deploy the module inside
+[ADD EXPLANATION]
 
-`dfx deploy --network ic you`
+## Create a canister in the subnet
 
-## Step 6: Perform your first daily-check
+> In this step, we are merely setting up a container without deploying any code. To maximize the network's potential, we will all deploy in the same subnet.
 
-`dfx canister call --network ic you reboot_dailyCheck '("hello_world!")`
+`dfx canister create you --subnet bkfrj-6k62g-dycql-7h53p-atvkj-zg4to-gaogh-netha-ptybj-ntsgw-rqe --ic`
 
-Welcome to Reboot!
+## Create the WebAssembly module
+
+In this step, we are compiling the Motoko file to create the WebAssembly module.
+
+`dfx build you --ic`
+
+## Choose your name and install the WebAssembly module
+
+> Please provide your desired username for the Reboot game when you deploy your canister. Currently, you cannot change the username once set, unless you reinstall your canister.
+
+`dfx canister install you --ic --argument '("YOUR_NAME")'`
+
+## Perform your first check
+
+`dfx canister call you --ic reboot_dailyCheck '("Hello World!")`
+
+**Welcome to the Reboot!**

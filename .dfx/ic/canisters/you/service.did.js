@@ -6,4 +6,4 @@ export const idlFactory = ({ IDL }) => {
   });
   return UserCanister;
 };
-export const init = ({ IDL }) => { return []; };
+export const init = ({ IDL }) => { return [IDL.Text]; };
