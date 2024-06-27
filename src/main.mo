@@ -48,29 +48,49 @@ shared ({ caller = creator }) actor class UserCanister(
         return alive;
     };
 
-    // Import the board actor
+    // Import the board actor and related types
+    public type WriteError = {
+        #NotEnoughCycles;
+        #MemoryFull;
+        #NameTooLong;
+        #MoodTooLong;
+        #NotAllowed;
+    };
+
+    public type MessageError = {
+        #NotEnoughCycles;
+        #MemoryFull;
+        #MessageTooLong;
+        #NotAllowed;
+    };
+
     let board = actor ("q3gy3-sqaaa-aaaas-aaajq-cai") : actor {
-        reboot_board_writeDailyCheck : (name : Name, mood : Mood) -> async ();
+        reboot_board_write : (name : Name, mood : Mood) -> async Result<(), WriteError>;
     };
 
     public shared ({ caller }) func reboot_user_dailyCheck(
         mood : Mood
-    ) : async () {
+    ) : async Result<(), WriteError> {
         assert (caller == owner);
         alive := true;
         latestPing := Time.now();
 
         // Write the daily check to the board
         try {
-            await board.reboot_board_writeDailyCheck(name, mood);
+            Cycles.add<system>(1_000_000_000);
+            await board.reboot_board_write(name, mood);
         } catch (e) {
             throw e;
         };
     };
 
     stable var friendRequestId : Nat = 0;
-    stable var friends : [Friends.Friend] = [];
     var friendRequests : [Friends.FriendRequest] = [];
+
+    stable var friends : [Friends.Friend] = [];
+
+    stable var messagesId : Nat = 0;
+    var messages : [(Nat, Text)] = [];
 
     public shared ({ caller }) func reboot_user_receiveFriendRequest(
         name : Text,
@@ -176,6 +196,74 @@ shared ({ caller = creator }) actor class UserCanister(
         return #err("Friend not found with canisterId " # Principal.toText(canisterId));
     };
 
+    public shared ({ caller }) func reboot_user_sendMessage(
+        receiver : Principal,
+        message : Text,
+    ) : async Result<(), MessageError> {
+        assert (caller == owner);
+        // Create the actor reference
+        let friendActor = actor (Principal.toText(receiver)) : actor {
+            reboot_user_receiveMessage : (message : Text) -> async Result<(), MessageError>;
+        };
+        // Attach the cycles to the call (1 billion cycles)
+        Cycles.add<system>(1_000_000_000);
+        // Call the function (handle potential errors)
+        try {
+            return await friendActor.reboot_user_receiveMessage(message);
+        } catch (e) {
+            throw e;
+        };
+    };
+
+    public shared ({ caller }) func reboot_user_receiveMessage(
+        message : Text
+    ) : async Result<(), MessageError> {
+        // Check if there is enough cycles attached (Fee for Message) and accept them
+        let availableCycles = Cycles.available();
+        let acceptedCycles = Cycles.accept<system>(availableCycles);
+        if (acceptedCycles < 1_000_000_000) {
+            return #err(#NotEnoughCycles);
+        };
+        // Check that the message is not too long
+        if (message.size() > 1024) {
+            return #err(#MessageTooLong);
+        };
+
+        // Check if the caller is already a friend
+        for (friend in friends.vals()) {
+            if (friend.canisterId == caller) {
+                messages := Array.append<(Nat, Text)>(messages, [(messagesId, message)]);
+                messagesId += 1;
+                return #ok();
+            };
+        };
+        return #err(#NotAllowed);
+    };
+
+    public shared ({ caller }) func reboot_user_getMessages() : async [(Nat, Text)] {
+        assert (caller == owner);
+        return messages;
+    };
+
+    public shared ({ caller }) func reboot_user_readMessage(
+        id : Nat
+    ) : async Result<(), Text> {
+        assert (caller == owner);
+        for (message in messages.vals()) {
+            if (message.0 == id) {
+                messages := Array.filter<(Nat, Text)>(messages, func(x : (Nat, Text)) { x.0 == id });
+                return #ok();
+            };
+        };
+        return #err("Message not found with id " # Nat.toText(id));
+    };
+
+    public shared ({ caller }) func reboot_user_readAllMessages() : async Result<(), Text> {
+        assert (caller == owner);
+        messages := [];
+        return #ok();
+    };
+
     public query func reboot_user_version() : async (Nat, Nat, Nat) {
         return version;
     };
@@ -193,6 +281,7 @@ shared ({ caller = creator }) actor class UserCanister(
                 # "Alive: " # Bool.toText(alive) # "\n"
                 # "Friends: " # Nat.toText(friends.size()) # "\n"
                 # "Pending requests: " # Nat.toText(friendRequests.size()) # "\n"
+                # "Pending messages: " # Nat.toText(messages.size()) # "\n"
                 # "Version: " # Nat.toText(version.0) # "." # Nat.toText(version.1) # "." # Nat.toText(version.2) # "\n"
                 # "Cycle Balance: " # Nat.toText(Cycles.balance()) # " cycles " # "(" # Nat.toText(Cycles.balance() / 1_000_000_000_000) # " T" # ")\n"
                 # "Heap size (current): " # Nat.toText(Prim.rts_heap_size()) # " bytes " # "(" # Float.toText(Float.fromInt(Prim.rts_heap_size() / (1024 * 1024))) # " Mb" # ")\n"
