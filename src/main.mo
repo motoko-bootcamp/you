@@ -6,47 +6,54 @@ import Text "mo:base/Text";
 import Friends "friends";
 import Cycles "mo:base/ExperimentalCycles";
 import Nat "mo:base/Nat";
+import Int "mo:base/Int";
 import Result "mo:base/Result";
+import Bool "mo:base/Bool";
+import Float "mo:base/Float";
+import Http "http";
+import Prim "mo:⛔";
+
 shared ({ caller = creator }) actor class UserCanister(
     yourName : Text
 ) = this {
+    let NANOSECONDS_PER_DAY = 24 * 60 * 60 * 1_000_000_000;
 
-    public type Result<Ok, Err> = Result.Result<Ok, Err>;
+    stable let version : Nat = 0;
+    stable let birth : Time.Time = Time.now();
+    stable let owner : Principal = creator;
+    stable let name : Name = yourName;
+
     public type Mood = Text;
     public type Name = Text;
     public type Friend = Friends.Friend;
     public type FriendRequest = Friends.FriendRequest;
     public type FriendRequestResult = Friends.FriendRequestResult;
-
-    stable let birth : Time.Time = Time.now();
-
-    stable var friendRequestId : Nat = 0;
-    stable var friendRequests : [Friends.FriendRequest] = [];
-    stable var friends : [Friends.Friend] = [];
-
-    let name : Name = yourName;
-    let owner : Principal = creator;
-    let nanosecondsPerDay = 24 * 60 * 60 * 1_000_000_000;
-
-    let board = actor ("q3gy3-sqaaa-aaaas-aaajq-cai") : actor {
-        reboot_writeDailyCheck : (name : Name, mood : Mood) -> async ();
-    };
+    public type Result<Ok, Err> = Result.Result<Ok, Err>;
 
     stable var alive : Bool = true;
     stable var latestPing : Time.Time = Time.now();
 
+    // Function to kill the user if they haven't pinged in 24 hours
     func _kill() : async () {
         let now = Time.now();
-        if (now - latestPing > nanosecondsPerDay) {
+        if (now - latestPing > NANOSECONDS_PER_DAY) {
             alive := false;
         };
     };
 
     // Timer to reset the alive status every 24 hours
-    let _daily = Timer.recurringTimer<system>(#nanoseconds(nanosecondsPerDay), _kill);
+    let _daily = Timer.recurringTimer<system>(#nanoseconds(NANOSECONDS_PER_DAY), _kill);
 
-    // The idea here is to have a function to call every 24 hours to indicate that you are alive
-    public shared ({ caller }) func reboot_dailyCheck(
+    public query func reboot_user_isAlive() : async Bool {
+        return alive;
+    };
+
+    // Import the board actor
+    let board = actor ("q3gy3-sqaaa-aaaas-aaajq-cai") : actor {
+        reboot_board_writeDailyCheck : (name : Name, mood : Mood) -> async ();
+    };
+
+    public shared ({ caller }) func reboot_user_dailyCheck(
         mood : Mood
     ) : async () {
         assert (caller == owner);
@@ -55,43 +62,17 @@ shared ({ caller = creator }) actor class UserCanister(
 
         // Write the daily check to the board
         try {
-            await board.reboot_writeDailyCheck(name, mood);
+            await board.reboot_board_writeDailyCheck(name, mood);
         } catch (e) {
             throw e;
         };
     };
 
-    public query func reboot_isAlive() : async Bool {
-        return alive;
-    };
+    stable var friendRequestId : Nat = 0;
+    stable var friends : [Friends.Friend] = [];
+    var friendRequests : [Friends.FriendRequest] = [];
 
-    public query func reboot_supportedStandards() : async [{
-        name : Text;
-        url : Text;
-    }] {
-        return ([{
-            name = "Reboot";
-            url = "https://github.com/motoko-bootcamp/reboot/blob/main/standards/reboot.md";
-        }]);
-    };
-
-    // public query func reboot_getName() : async Name {
-    //     return name;
-    // };
-
-    // public query func reboot_getOwner() : async Principal {
-    //     return owner;
-    // };
-
-    // public query func reboot_getBirth() : async Int {
-    //     return birth;
-    // };
-
-    // public query func reboot_getAge() : async Int {
-    //     return Time.now() - birth;
-    // };
-
-    public shared ({ caller }) func reboot_friends_receiveFriendRequest(
+    public shared ({ caller }) func reboot_user_receiveFriendRequest(
         name : Text,
         message : Text,
     ) : async FriendRequestResult {
@@ -128,7 +109,7 @@ shared ({ caller = creator }) actor class UserCanister(
         return #ok();
     };
 
-    public shared ({ caller }) func reboot_friends_sendFriendRequest(
+    public shared ({ caller }) func reboot_user_sendFriendRequest(
         receiver : Principal,
         message : Text,
     ) : async FriendRequestResult {
@@ -147,12 +128,12 @@ shared ({ caller = creator }) actor class UserCanister(
         };
     };
 
-    public shared query ({ caller }) func reboot_friends_getFriendRequests() : async [FriendRequest] {
+    public shared query ({ caller }) func reboot_user_getFriendRequests() : async [FriendRequest] {
         assert (caller == owner);
         return friendRequests;
     };
 
-    public shared ({ caller }) func reboot_friends_handleFriendRequest(
+    public shared ({ caller }) func reboot_user_handleFriendRequest(
         id : Nat,
         accept : Bool,
     ) : async Result<(), Text> {
@@ -165,11 +146,11 @@ shared ({ caller = creator }) actor class UserCanister(
                     // Add the friend to the list
                     friends := Array.append<Friend>(friends, [{ name = request.name; canisterId = request.sender }]);
                     // Remove the request from the list
-                    friendRequests := Array.filter<FriendRequest>(friendRequests, func(x) { x == id });
+                    friendRequests := Array.filter<FriendRequest>(friendRequests, func(request : FriendRequest) { request.id == id });
                     return #ok();
                 } else {
                     // Remove the request from the list
-                    friendRequests := Array.filter<FriendRequest>(friendRequests, func(x) { x == id });
+                    friendRequests := Array.filter<FriendRequest>(friendRequests, func(request : FriendRequest) { request.id == id });
                     return #ok();
                 };
             };
@@ -177,12 +158,12 @@ shared ({ caller = creator }) actor class UserCanister(
         return #err("Friend request not found for id " # Nat.toText(id));
     };
 
-    public shared ({ caller }) func reboot_friends_getFriends() : async [Friend] {
+    public shared ({ caller }) func reboot_user_getFriends() : async [Friend] {
         assert (caller == owner);
         return friends;
     };
 
-    public shared ({ caller }) func reboot_friends_removeFriend(
+    public shared ({ caller }) func reboot_user_removeFriend(
         canisterId : Principal
     ) : async Result<(), Text> {
         assert (caller == owner);
@@ -193,6 +174,34 @@ shared ({ caller = creator }) actor class UserCanister(
             };
         };
         return #err("Friend not found with canisterId " # Principal.toText(canisterId));
+    };
+
+    public query func reboot_user_version() : async Nat {
+        return version;
+    };
+
+    public type HttpRequest = Http.Request;
+    public type HttpResponse = Http.Response;
+    public query func http_request(_request : HttpRequest) : async HttpResponse {
+        return ({
+            body = Text.encodeUtf8(
+                "You\n"
+                # "---\n"
+                # "Name: " # name # "\n"
+                # "Owner: " # Principal.toText(owner) # "\n"
+                # "Birth: " # Int.toText(birth) # "\n"
+                # "Alive: " # Bool.toText(alive) # "\n"
+                # "Friends: " # Nat.toText(friends.size()) # "\n"
+                # "Pending requests: " # Nat.toText(friendRequests.size()) # "\n"
+                # "Version: " # Nat.toText(version) # "\n"
+                # "Cycle Balance: " # Nat.toText(Cycles.balance() / 1_000_000_000_000) # "T\n"
+                # "Heap size (current): " # Nat.toText(Prim.rts_heap_size()) # " bytes" # " ( " # Float.toText(Float.fromInt(Prim.rts_heap_size() / (1024 * 1024))) # "Mb" # " )\n"
+                # "Heap size (max): " # Nat.toText(Prim.rts_max_live_size()) # " bytes" # " ( " # Float.toText(Float.fromInt(Prim.rts_max_live_size() / (1024 * 1024))) # "Mb" # " )\n"
+                # "Memory size: " # Nat.toText(Prim.rts_memory_size()) # " bytes" # " ( " # Float.toText(Float.fromInt(Prim.rts_memory_size() / (1024 * 1024))) # "Mb" # " )\n"
+            );
+            headers = [("Content-Type", "text/plain")];
+            status_code = 200;
+        });
     };
 
 };
