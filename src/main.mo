@@ -136,13 +136,13 @@ shared ({ caller = creator }) actor class UserCanister(
         assert (caller == owner);
         // Create the actor reference
         let friendActor = actor (Principal.toText(receiver)) : actor {
-            reboot_friends_receiveFriendRequest : (name : Text, message : Text) -> async FriendRequestResult;
+            reboot_user_receiveFriendRequest : (name : Text, message : Text) -> async FriendRequestResult;
         };
         // Attach the cycles to the call (1 billion cycles)
         Cycles.add<system>(1_000_000_000);
         // Call the function (handle potential errors)
         try {
-            return await friendActor.reboot_friends_receiveFriendRequest(name, message);
+            return await friendActor.reboot_user_receiveFriendRequest(name, message);
         } catch (e) {
             throw e;
         };
@@ -240,12 +240,12 @@ shared ({ caller = creator }) actor class UserCanister(
         return #err(#NotAllowed);
     };
 
-    public shared ({ caller }) func reboot_user_getMessages() : async [(Nat, Text)] {
+    public shared ({ caller }) func reboot_user_readMessages() : async [(Nat, Text)] {
         assert (caller == owner);
         return messages;
     };
 
-    public shared ({ caller }) func reboot_user_readMessage(
+    public shared ({ caller }) func reboot_user_clearMessage(
         id : Nat
     ) : async Result<(), Text> {
         assert (caller == owner);
@@ -258,7 +258,7 @@ shared ({ caller = creator }) actor class UserCanister(
         return #err("Message not found with id " # Nat.toText(id));
     };
 
-    public shared ({ caller }) func reboot_user_readAllMessages() : async Result<(), Text> {
+    public shared ({ caller }) func reboot_user_clearAllMessages() : async Result<(), Text> {
         assert (caller == owner);
         messages := [];
         return #ok();
