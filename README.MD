@@ -1,7 +1,9 @@
 # How to start your digital life?
 
+> This repository is part of the Reboot. For more information, check [the official repository](https://github.com/motoko-bootcamp/reboot/).
+
 <div align="center">
-  <img src="img/reboot.png" alt="reboot" title="Start" width="300px"/>
+  <img src="img/you.png" alt="You" title="Start" width="300px"/>
 </div>
 
 ## Create a dedicated identity
