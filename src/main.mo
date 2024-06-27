@@ -18,7 +18,7 @@ shared ({ caller = creator }) actor class UserCanister(
 ) = this {
     let NANOSECONDS_PER_DAY = 24 * 60 * 60 * 1_000_000_000;
 
-    stable let version : Nat = 0;
+    stable let version : (Nat, Nat, Nat) = (0, 0, 1);
     stable let birth : Time.Time = Time.now();
     stable let owner : Principal = creator;
     stable let name : Name = yourName;
@@ -176,7 +176,7 @@ shared ({ caller = creator }) actor class UserCanister(
         return #err("Friend not found with canisterId " # Principal.toText(canisterId));
     };
 
-    public query func reboot_user_version() : async Nat {
+    public query func reboot_user_version() : async (Nat, Nat, Nat) {
         return version;
     };
 
@@ -193,11 +193,11 @@ shared ({ caller = creator }) actor class UserCanister(
                 # "Alive: " # Bool.toText(alive) # "\n"
                 # "Friends: " # Nat.toText(friends.size()) # "\n"
                 # "Pending requests: " # Nat.toText(friendRequests.size()) # "\n"
-                # "Version: " # Nat.toText(version) # "\n"
-                # "Cycle Balance: " # Nat.toText(Cycles.balance() / 1_000_000_000_000) # "T\n"
-                # "Heap size (current): " # Nat.toText(Prim.rts_heap_size()) # " bytes" # " ( " # Float.toText(Float.fromInt(Prim.rts_heap_size() / (1024 * 1024))) # "Mb" # " )\n"
-                # "Heap size (max): " # Nat.toText(Prim.rts_max_live_size()) # " bytes" # " ( " # Float.toText(Float.fromInt(Prim.rts_max_live_size() / (1024 * 1024))) # "Mb" # " )\n"
-                # "Memory size: " # Nat.toText(Prim.rts_memory_size()) # " bytes" # " ( " # Float.toText(Float.fromInt(Prim.rts_memory_size() / (1024 * 1024))) # "Mb" # " )\n"
+                # "Version: " # Nat.toText(version.0) # "." # Nat.toText(version.1) # "." # Nat.toText(version.2) # "\n"
+                # "Cycle Balance: " # Nat.toText(Cycles.balance()) # " cycles " # "(" # Nat.toText(Cycles.balance() / 1_000_000_000_000) # " T" # ")\n"
+                # "Heap size (current): " # Nat.toText(Prim.rts_heap_size()) # " bytes " # "(" # Float.toText(Float.fromInt(Prim.rts_heap_size() / (1024 * 1024))) # " Mb" # ")\n"
+                # "Heap size (max): " # Nat.toText(Prim.rts_max_live_size()) # " bytes " # "(" # Float.toText(Float.fromInt(Prim.rts_max_live_size() / (1024 * 1024))) # " Mb" # ")\n"
+                # "Memory size: " # Nat.toText(Prim.rts_memory_size()) # " bytes " # "(" # Float.toText(Float.fromInt(Prim.rts_memory_size() / (1024 * 1024))) # " Mb" # ")\n"
             );
             headers = [("Content-Type", "text/plain")];
             status_code = 200;
