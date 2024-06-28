@@ -18,7 +18,7 @@ shared ({ caller = creator }) actor class UserCanister(
 ) = this {
     let NANOSECONDS_PER_DAY = 24 * 60 * 60 * 1_000_000_000;
 
-    stable let version : (Nat, Nat, Nat) = (0, 0, 1);
+    stable let version : (Nat, Nat, Nat) = (0, 0, 2);
     stable let birth : Time.Time = Time.now();
     stable let owner : Principal = creator;
     stable let name : Name = yourName;
