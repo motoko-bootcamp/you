@@ -90,7 +90,7 @@ shared ({ caller = creator }) actor class UserCanister(
     stable var friends : [Friends.Friend] = [];
 
     stable var messagesId : Nat = 0;
-    var messages : [(Nat, Text)] = [];
+    var messages : [(Nat, Name, Text)] = [];
 
     public shared ({ caller }) func reboot_user_receiveFriendRequest(
         name : Text,
@@ -166,11 +166,11 @@ shared ({ caller = creator }) actor class UserCanister(
                     // Add the friend to the list
                     friends := Array.append<Friend>(friends, [{ name = request.name; canisterId = request.sender }]);
                     // Remove the request from the list
-                    friendRequests := Array.filter<FriendRequest>(friendRequests, func(request : FriendRequest) { request.id == id });
+                    friendRequests := Array.filter<FriendRequest>(friendRequests, func(request : FriendRequest) { request.id != id });
                     return #ok();
                 } else {
                     // Remove the request from the list
-                    friendRequests := Array.filter<FriendRequest>(friendRequests, func(request : FriendRequest) { request.id == id });
+                    friendRequests := Array.filter<FriendRequest>(friendRequests, func(request : FriendRequest) { request.id != id });
                     return #ok();
                 };
             };
@@ -189,7 +189,7 @@ shared ({ caller = creator }) actor class UserCanister(
         assert (caller == owner);
         for (friend in friends.vals()) {
             if (friend.canisterId == canisterId) {
-                friends := Array.filter<Friends.Friend>(friends, func(x : Friend) { x.canisterId == canisterId });
+                friends := Array.filter<Friends.Friend>(friends, func(x : Friend) { x.canisterId != canisterId });
                 return #ok();
             };
         };
@@ -232,7 +232,7 @@ shared ({ caller = creator }) actor class UserCanister(
         // Check if the caller is already a friend
         for (friend in friends.vals()) {
             if (friend.canisterId == caller) {
-                messages := Array.append<(Nat, Text)>(messages, [(messagesId, message)]);
+                messages := Array.append<(Nat, Name, Text)>(messages, [(messagesId, friend.name, message)]);
                 messagesId += 1;
                 return #ok();
             };
@@ -240,7 +240,7 @@ shared ({ caller = creator }) actor class UserCanister(
         return #err(#NotAllowed);
     };
 
-    public shared ({ caller }) func reboot_user_readMessages() : async [(Nat, Text)] {
+    public shared ({ caller }) func reboot_user_readMessages() : async [(Nat, Name, Text)] {
         assert (caller == owner);
         return messages;
     };
@@ -251,7 +251,7 @@ shared ({ caller = creator }) actor class UserCanister(
         assert (caller == owner);
         for (message in messages.vals()) {
             if (message.0 == id) {
-                messages := Array.filter<(Nat, Text)>(messages, func(x : (Nat, Text)) { x.0 == id });
+                messages := Array.filter<(Nat, Name, Text)>(messages, func(x : (Nat, Name, Text)) { x.0 != id });
                 return #ok();
             };
         };
