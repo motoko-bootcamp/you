@@ -42,7 +42,7 @@ In this step, we are compiling the Motoko file to create the WebAssembly module.
 
 ## Perform your first check
 
-`dfx canister call you --ic reboot_dailyCheck '("Hello World!")'`
+`dfx canister call you --ic reboot_user_dailyCheck '("Hello World!")'`
 
 ## Check your entry into the network.
 
