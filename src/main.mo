@@ -1,9 +1,7 @@
-import Array "mo:base/Array";
 import Principal "mo:base/Principal";
 import Time "mo:base/Time";
 import Timer "mo:base/Timer";
 import Text "mo:base/Text";
-import Friends "friends";
 import Cycles "mo:base/ExperimentalCycles";
 import Nat "mo:base/Nat";
 import Int "mo:base/Int";
@@ -25,9 +23,6 @@ shared ({ caller = creator }) actor class UserCanister(
 
     public type Mood = Text;
     public type Name = Text;
-    public type Friend = Friends.Friend;
-    public type FriendRequest = Friends.FriendRequest;
-    public type FriendRequestResult = Friends.FriendRequestResult;
     public type Result<Ok, Err> = Result.Result<Ok, Err>;
 
     stable var alive : Bool = true;
@@ -87,190 +82,41 @@ shared ({ caller = creator }) actor class UserCanister(
     stable var friendRequestId : Nat = 0;
     var friendRequests : [Friends.FriendRequest] = [];
 
-    stable var friends : [Friends.Friend] = [];
+//-----------------------END BASE-------------------
+//-----------------------Contacts--------------------
 
-    stable var messagesId : Nat = 0;
-    var messages : [(Nat, Name, Text)] = [];
-
-    public shared ({ caller }) func reboot_user_receiveFriendRequest(
-        name : Text,
-        message : Text,
-    ) : async FriendRequestResult {
-        // Check if there is enough cycles attached (Fee for Friend Request) and accept them
-        let availableCycles = Cycles.available();
-        let acceptedCycles = Cycles.accept<system>(availableCycles);
-        if (acceptedCycles < 1_000_000_000) {
-            return #err(#NotEnoughCycles);
-        };
-
-        let request : FriendRequest = {
-            id = friendRequestId;
-            name = name;
-            sender = caller;
-            message = message;
-        };
-
-        // Check if the user is already a friend
-        for (friend in friends.vals()) {
-            if (friend.canisterId == caller) {
-                return #err(#AlreadyFriend);
-            };
-        };
-
-        // Check if the user has already sent a friend request
-        for (request in friendRequests.vals()) {
-            if (request.sender == caller) {
-                return #err(#AlreadyRequested);
-            };
-        };
-
-        friendRequests := Array.append<FriendRequest>(friendRequests, [request]);
-        friendRequestId += 1;
-        return #ok();
-    };
-
-    public shared ({ caller }) func reboot_user_sendFriendRequest(
-        receiver : Principal,
-        message : Text,
-    ) : async FriendRequestResult {
+    public query ({caller}) func reboot_getName() : async Name {
         assert (caller == owner);
-        // Create the actor reference
-        let friendActor = actor (Principal.toText(receiver)) : actor {
-            reboot_user_receiveFriendRequest : (name : Text, message : Text) -> async FriendRequestResult;
-        };
-        // Attach the cycles to the call (1 billion cycles)
-        Cycles.add<system>(1_000_000_000);
-        // Call the function (handle potential errors)
-        try {
-            return await friendActor.reboot_user_receiveFriendRequest(name, message);
-        } catch (e) {
-            throw e;
-        };
+        return name;
     };
 
-    public shared query ({ caller }) func reboot_user_getFriendRequests() : async [FriendRequest] {
+    public query ({caller}) func reboot_getOwner() : async Principal {
         assert (caller == owner);
-        return friendRequests;
+        return owner;
     };
 
-    public shared ({ caller }) func reboot_user_handleFriendRequest(
-        id : Nat,
-        accept : Bool,
-    ) : async Result<(), Text> {
+    public query ({caller}) func reboot_getBirth() : async Int {
         assert (caller == owner);
-        // Check that the friend request exists
-        for (request in friendRequests.vals()) {
-            if (request.id == id) {
-                // If the request is accepted
-                if (accept) {
-                    // Add the friend to the list
-                    friends := Array.append<Friend>(friends, [{ name = request.name; canisterId = request.sender }]);
-                    // Remove the request from the list
-                    friendRequests := Array.filter<FriendRequest>(friendRequests, func(request : FriendRequest) { request.id != id });
-                    return #ok();
-                } else {
-                    // Remove the request from the list
-                    friendRequests := Array.filter<FriendRequest>(friendRequests, func(request : FriendRequest) { request.id != id });
-                    return #ok();
-                };
-            };
-        };
-        return #err("Friend request not found for id " # Nat.toText(id));
+        return birth;
     };
 
-    public shared ({ caller }) func reboot_user_getFriends() : async [Friend] {
+    public query ({caller}) func reboot_getAge() : async Int {
         assert (caller == owner);
-        return friends;
+        return Time.now() - birth;
     };
 
-    public shared ({ caller }) func reboot_user_removeFriend(
-        canisterId : Principal
-    ) : async Result<(), Text> {
-        assert (caller == owner);
-        for (friend in friends.vals()) {
-            if (friend.canisterId == canisterId) {
-                friends := Array.filter<Friends.Friend>(friends, func(x : Friend) { x.canisterId != canisterId });
-                return #ok();
-            };
-        };
-        return #err("Friend not found with canisterId " # Principal.toText(canisterId));
-    };
 
-    public shared ({ caller }) func reboot_user_sendMessage(
-        receiver : Principal,
-        message : Text,
-    ) : async Result<(), MessageError> {
-        assert (caller == owner);
-        // Create the actor reference
-        let friendActor = actor (Principal.toText(receiver)) : actor {
-            reboot_user_receiveMessage : (message : Text) -> async Result<(), MessageError>;
-        };
-        // Attach the cycles to the call (1 billion cycles)
-        Cycles.add<system>(1_000_000_000);
-        // Call the function (handle potential errors)
-        try {
-            return await friendActor.reboot_user_receiveMessage(message);
-        } catch (e) {
-            throw e;
-        };
-    };
-
-    public shared ({ caller }) func reboot_user_receiveMessage(
-        message : Text
-    ) : async Result<(), MessageError> {
-        // Check if there is enough cycles attached (Fee for Message) and accept them
-        let availableCycles = Cycles.available();
-        let acceptedCycles = Cycles.accept<system>(availableCycles);
-        if (acceptedCycles < 1_000_000_000) {
-            return #err(#NotEnoughCycles);
-        };
-        // Check that the message is not too long
-        if (message.size() > 1024) {
-            return #err(#MessageTooLong);
-        };
-
-        // Check if the caller is already a friend
-        for (friend in friends.vals()) {
-            if (friend.canisterId == caller) {
-                messages := Array.append<(Nat, Name, Text)>(messages, [(messagesId, friend.name, message)]);
-                messagesId += 1;
-                return #ok();
-            };
-        };
-        return #err(#NotAllowed);
-    };
-
-    public shared ({ caller }) func reboot_user_readMessages() : async [(Nat, Name, Text)] {
-        assert (caller == owner);
-        return messages;
-    };
-
-    public shared ({ caller }) func reboot_user_clearMessage(
-        id : Nat
-    ) : async Result<(), Text> {
-        assert (caller == owner);
-        for (message in messages.vals()) {
-            if (message.0 == id) {
-                messages := Array.filter<(Nat, Name, Text)>(messages, func(x : (Nat, Name, Text)) { x.0 != id });
-                return #ok();
-            };
-        };
-        return #err("Message not found with id " # Nat.toText(id));
-    };
-
-    public shared ({ caller }) func reboot_user_clearAllMessages() : async Result<(), Text> {
-        assert (caller == owner);
-        messages := [];
-        return #ok();
-    };
-
-    public query func reboot_user_version() : async (Nat, Nat, Nat) {
-        return version;
+    public shared query func reboot_user_getModules () : async [(Text, Principal)] {
+        return modules;
     };
 
     public type HttpRequest = Http.Request;
     public type HttpResponse = Http.Response;
-    public query func http_request(_request : HttpRequest) : async HttpResponse {
+    public shared func http_request(_request : HttpRequest) : async HttpResponse {
+
+        // let friendRequests = await reboot_contacts_getFriendRequests();
+        // let friends = await reboot_contacts_getFriends();
+
         return ({
             body = Text.encodeUtf8(
                 "You\n"
@@ -279,9 +125,9 @@ shared ({ caller = creator }) actor class UserCanister(
                 # "Owner: " # Principal.toText(owner) # "\n"
                 # "Birth: " # Int.toText(birth) # "\n"
                 # "Alive: " # Bool.toText(alive) # "\n"
-                # "Friends: " # Nat.toText(friends.size()) # "\n"
-                # "Pending requests: " # Nat.toText(friendRequests.size()) # "\n"
-                # "Pending messages: " # Nat.toText(messages.size()) # "\n"
+                // # "Friends: " # Nat.toText(friends.size()) # "\n"
+                // # "Pending requests: " # Nat.toText(friendRequests.size()) # "\n"
+                // # "Pending messages: " # Nat.toText(messages.size()) # "\n"
                 # "Version: " # Nat.toText(version.0) # "." # Nat.toText(version.1) # "." # Nat.toText(version.2) # "\n"
                 # "Cycle Balance: " # Nat.toText(Cycles.balance()) # " cycles " # "(" # Nat.toText(Cycles.balance() / 1_000_000_000_000) # " T" # ")\n"
                 # "Heap size (current): " # Nat.toText(Prim.rts_heap_size()) # " bytes " # "(" # Float.toText(Float.fromInt(Prim.rts_heap_size() / (1024 * 1024))) # " Mb" # ")\n"
@@ -291,6 +137,15 @@ shared ({ caller = creator }) actor class UserCanister(
             headers = [("Content-Type", "text/plain")];
             status_code = 200;
         });
+    };
+    
+//-----------------------END Contacts----------------
+
+
+//-----------------------Admin----------------------
+
+    public query func reboot_user_version() : async (Nat, Nat, Nat) {
+        return version;
     };
 
 };
