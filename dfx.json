@@ -3,6 +3,22 @@
         "you" : {
             "main" : "src/main.mo",
             "type" : "motoko"
+        },
+        "ricardo" : {
+            "main" : "src/main.mo",
+            "type" : "motoko"
+        },
+        "you_friends" : {
+            "main" : "src/canisters/friends/main.mo",
+            "type" : "motoko"
+        },
+        "maru" : {
+            "main" : "src/main.mo",
+            "type" : "motoko"
+        },
+        "maru_friends" : {
+            "main" : "src/canisters/friends/main.mo",
+            "type" : "motoko"
         }
     }
 }
