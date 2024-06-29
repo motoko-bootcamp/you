@@ -28,6 +28,8 @@ shared ({ caller = creator }) actor class UserCanister(
     stable var alive : Bool = true;
     stable var latestPing : Time.Time = Time.now();
 
+    stable var modules : [(Text, Principal)] = [];
+
     // Function to kill the user if they haven't pinged in 24 hours
     func _kill() : async () {
         let now = Time.now();
@@ -78,9 +80,6 @@ shared ({ caller = creator }) actor class UserCanister(
             throw e;
         };
     };
-
-    stable var friendRequestId : Nat = 0;
-    var friendRequests : [Friends.FriendRequest] = [];
 
 //-----------------------END BASE-------------------
 //-----------------------Contacts--------------------
