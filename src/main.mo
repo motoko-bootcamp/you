@@ -21,7 +21,7 @@ shared ({ caller = creator }) actor class UserCanister(
 ) = this {
     let NANOSECONDS_PER_DAY = 24 * 60 * 60 * 1_000_000_000;
 
-    stable let version : (Nat, Nat, Nat) = (0, 0, 1);
+    stable let version : (Nat, Nat, Nat) = (0, 0, 2);
     stable let birth : Time.Time = Time.now();
     stable let owner : Principal = creator;
     stable let name : Name = yourName;
@@ -165,7 +165,7 @@ shared ({ caller = creator }) actor class UserCanister(
 //-----------------------Messages-------------------
 
     stable var messagesId : Nat = 0;
-    var messages : [(Nat, Text)] = [];
+    var messages : [(Nat, Name, Text)] = [];
 
     public shared ({ caller }) func reboot_user_sendMessage(
         receiver : Principal,
@@ -194,7 +194,7 @@ shared ({ caller = creator }) actor class UserCanister(
         message : Text
     ) : async Result<(), MessageError> {
 
-        let messageBuffer : Buffer.Buffer<(Nat, Text)> = Buffer.fromArray(messages);
+        let messageBuffer : Buffer.Buffer<(Nat, Text, Text)> = Buffer.fromArray(messages);
 
         // Check if there is enough cycles attached (Fee for Message) and accept them
         let availableCycles = Cycles.available();
@@ -213,7 +213,7 @@ shared ({ caller = creator }) actor class UserCanister(
         // Check if the caller is already a friend
         for (friend in friends.vals()) {
             if (friend.canisterId == caller) {
-                messageBuffer.add((messagesId, message));
+                messageBuffer.add((messagesId, friend.name, message));
                 messages := Buffer.toArray(messageBuffer);
                 messagesId += 1;
                 return #ok();
@@ -222,25 +222,25 @@ shared ({ caller = creator }) actor class UserCanister(
         return #err(#NotAllowed);
     };
 
-    public shared ({ caller }) func reboot_user_getMessages() : async [(Nat, Text)] {
+    public shared ({ caller }) func reboot_user_readMessages() : async [(Nat, Name, Text)] {
         assert (caller == owner);
         return messages;
     };
 
-    public shared ({ caller }) func reboot_user_readMessage(
+    public shared ({ caller }) func reboot_user_clearMessage(
         id : Nat
     ) : async Result<(), Text> {
         assert (caller == owner);
         for (message in messages.vals()) {
             if (message.0 == id) {
-                messages := Array.filter<(Nat, Text)>(messages, func(x : (Nat, Text)) { x.0 == id });
+                messages := Array.filter<(Nat, Name, Text)>(messages, func(x : (Nat, Name, Text)) { x.0 != id });
                 return #ok();
             };
         };
         return #err("Message not found with id " # Nat.toText(id));
     };
 
-    public shared ({ caller }) func reboot_user_readAllMessages() : async Result<(), Text> {
+    public shared ({ caller }) func reboot_user_clearAllMessages() : async Result<(), Text> {
         assert (caller == owner);
         messages := [];
         return #ok();
