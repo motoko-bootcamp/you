@@ -31,6 +31,8 @@ module {
       reboot_board_write : (name : Name, mood : Mood) -> async Result.Result<(), Service.WriteError>;
   };
 
+  public let init = Migration.migrate;
+
 
 
 

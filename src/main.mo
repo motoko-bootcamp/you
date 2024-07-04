@@ -46,13 +46,17 @@ shared ({ caller = creator }) actor class UserCanister(
     public type FriendRequestResult = Friends.FriendRequestResult;
     public type Result<Ok, Err> = Result.Result<Ok, Err>;
 
+    stable let youState = You.init(#v0_0_0(#data),#v0_1_0(#id), ?{
+      name = yourName;
+    }, creator);
+
     var you_ : ?You.You = null;
 
     private func you() : You.You {
         switch (you_) {
             case (?you) { return you; };
             case (null) {
-                let you = You.You(null, Principal.fromActor(this), ());
+                let you = You.You(?youState, Principal.fromActor(this), ());
                 you_ := ?you;
                 
                 return you;
