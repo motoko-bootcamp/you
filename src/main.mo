@@ -10,8 +10,12 @@ import Int "mo:base/Int";
 import Result "mo:base/Result";
 import Bool "mo:base/Bool";
 import Float "mo:base/Float";
+import Debug "mo:base/Debug";
 import Http "http";
 import Prim "mo:⛔";
+import You "you";
+import D "mo:base/Debug";
+import Service "service";
 
 shared ({ caller = creator }) actor class UserCanister(
     yourName : Text
@@ -23,249 +27,147 @@ shared ({ caller = creator }) actor class UserCanister(
     stable let owner : Principal = creator;
     stable let name : Name = yourName;
 
-    public type Mood = Text;
-    public type Name = Text;
-    public type Friend = Friends.Friend;
-    public type FriendRequest = Friends.FriendRequest;
-    public type FriendRequestResult = Friends.FriendRequestResult;
-    public type Result<Ok, Err> = Result.Result<Ok, Err>;
-
     stable var alive : Bool = true;
     stable var latestPing : Time.Time = Time.now();
 
-    // Function to kill the user if they haven't pinged in 24 hours
-    func _kill() : async () {
-        let now = Time.now();
-        if (now - latestPing > NANOSECONDS_PER_DAY) {
-            alive := false;
-        };
-    };
-
-    // Timer to reset the alive status every 24 hours
-    let _daily = Timer.recurringTimer<system>(#nanoseconds(NANOSECONDS_PER_DAY), _kill);
-
-    public query func reboot_user_isAlive() : async Bool {
-        return alive;
-    };
-
-    // Import the board actor and related types
-    public type WriteError = {
-        #NotEnoughCycles;
-        #MemoryFull;
-        #NameTooLong;
-        #MoodTooLong;
-        #NotAllowed;
-    };
-
-    public type MessageError = {
-        #NotEnoughCycles;
-        #MemoryFull;
-        #MessageTooLong;
-        #NotAllowed;
-    };
-
-    let board = actor ("q3gy3-sqaaa-aaaas-aaajq-cai") : actor {
-        reboot_board_write : (name : Name, mood : Mood) -> async Result<(), WriteError>;
-    };
-
-    public shared ({ caller }) func reboot_user_dailyCheck(
-        mood : Mood
-    ) : async Result<(), WriteError> {
-        assert (caller == owner);
-        alive := true;
-        latestPing := Time.now();
-
-        // Write the daily check to the board
-        try {
-            Cycles.add<system>(1_000_000_000);
-            await board.reboot_board_write(name, mood);
-        } catch (e) {
-            throw e;
-        };
-    };
-
     stable var friendRequestId : Nat = 0;
-    var friendRequests : [Friends.FriendRequest] = [];
+
 
     stable var friends : [Friends.Friend] = [];
 
     stable var messagesId : Nat = 0;
-    var messages : [(Nat, Name, Text)] = [];
+
+
+    public type Mood = You.Mood;
+    public type Name = You.Name;
+    public type Friend = You.Friend;
+    public type FriendRequest = You.FriendRequest;
+
+    public type FriendRequestResult = Friends.FriendRequestResult;
+    public type Result<Ok, Err> = Result.Result<Ok, Err>;
+
+    stable let youState = You.init(#v0_0_0(#data),#v0_1_0(#id), ?{
+      name = yourName;
+    }, creator);
+
+    var you_ : ?You.You = null;
+
+    private func you() : You.You {
+        switch (you_) {
+            case (?you) { return you; };
+            case (null) {
+                let you = You.You(?youState, Principal.fromActor(this), ());
+                you_ := ?you;
+                
+                return you;
+            };
+        };
+    };
+
+    public query func reboot_user_isAlive() : async Bool {
+        let ?youClass = you_ else D.trap("init needed");
+        return youClass.state.alive;
+    };
+
+    public shared(msg) func _init() : async() {
+      switch (you_) {
+        case (?you) { return; };
+        case (null) {
+          ignore you();
+          you().initTimer<system>();
+        };
+      };
+    };
+
+    func callInit() : async () {
+      let myActor : actor{
+        _init : () -> async ();
+      } = actor(Principal.toText(Principal.fromActor(this)));  
+      await myActor._init();
+    };
+
+    ignore Timer.setTimer<system>(#nanoseconds(0), callInit);
+
+    // Import the board actor and related types
+    public type WriteError = Service.WriteError;
+
+    public type MessageError = Service.MessageError;
+
+    
+
+    public shared ({ caller }) func reboot_user_dailyCheck(
+        mood : Mood
+    ) : async Result<(), WriteError> {
+        return await* you().reboot_user_dailyCheck<system>(caller, mood);
+    };
 
     public shared ({ caller }) func reboot_user_receiveFriendRequest(
         name : Text,
         message : Text,
     ) : async FriendRequestResult {
-        // Check if there is enough cycles attached (Fee for Friend Request) and accept them
-        let availableCycles = Cycles.available();
-        let acceptedCycles = Cycles.accept<system>(availableCycles);
-        if (acceptedCycles < 1_000_000_000) {
-            return #err(#NotEnoughCycles);
-        };
-
-        let request : FriendRequest = {
-            id = friendRequestId;
-            name = name;
-            sender = caller;
-            message = message;
-        };
-
-        // Check if the user is already a friend
-        for (friend in friends.vals()) {
-            if (friend.canisterId == caller) {
-                return #err(#AlreadyFriend);
-            };
-        };
-
-        // Check if the user has already sent a friend request
-        for (request in friendRequests.vals()) {
-            if (request.sender == caller) {
-                return #err(#AlreadyRequested);
-            };
-        };
-
-        friendRequests := Array.append<FriendRequest>(friendRequests, [request]);
-        friendRequestId += 1;
-        return #ok();
+        return await* you().reboot_user_receiveFriendRequest<system>(caller, name, message);
     };
 
     public shared ({ caller }) func reboot_user_sendFriendRequest(
         receiver : Principal,
         message : Text,
     ) : async FriendRequestResult {
-        assert (caller == owner);
-        // Create the actor reference
-        let friendActor = actor (Principal.toText(receiver)) : actor {
-            reboot_user_receiveFriendRequest : (name : Text, message : Text) -> async FriendRequestResult;
-        };
-        // Attach the cycles to the call (1 billion cycles)
-        Cycles.add<system>(1_000_000_000);
-        // Call the function (handle potential errors)
-        try {
-            return await friendActor.reboot_user_receiveFriendRequest(name, message);
-        } catch (e) {
-            throw e;
-        };
+        return await* you().reboot_user_sendFriendRequest<system>(caller, receiver, message);
     };
 
     public shared query ({ caller }) func reboot_user_getFriendRequests() : async [FriendRequest] {
-        assert (caller == owner);
-        return friendRequests;
+        assert (caller == you().state.owner);
+        return you().state.friendRequests;
     };
 
     public shared ({ caller }) func reboot_user_handleFriendRequest(
         id : Nat,
         accept : Bool,
     ) : async Result<(), Text> {
-        assert (caller == owner);
-        // Check that the friend request exists
-        for (request in friendRequests.vals()) {
-            if (request.id == id) {
-                // If the request is accepted
-                if (accept) {
-                    // Add the friend to the list
-                    friends := Array.append<Friend>(friends, [{ name = request.name; canisterId = request.sender }]);
-                    // Remove the request from the list
-                    friendRequests := Array.filter<FriendRequest>(friendRequests, func(request : FriendRequest) { request.id != id });
-                    return #ok();
-                } else {
-                    // Remove the request from the list
-                    friendRequests := Array.filter<FriendRequest>(friendRequests, func(request : FriendRequest) { request.id != id });
-                    return #ok();
-                };
-            };
-        };
-        return #err("Friend request not found for id " # Nat.toText(id));
+         return await* you().reboot_user_handleFriendRequest<system>(caller, id, accept);
     };
 
     public shared ({ caller }) func reboot_user_getFriends() : async [Friend] {
-        assert (caller == owner);
-        return friends;
+        assert (caller == you().state.owner);
+        return you().state.friends;
     };
 
     public shared ({ caller }) func reboot_user_removeFriend(
         canisterId : Principal
     ) : async Result<(), Text> {
-        assert (caller == owner);
-        for (friend in friends.vals()) {
-            if (friend.canisterId == canisterId) {
-                friends := Array.filter<Friends.Friend>(friends, func(x : Friend) { x.canisterId != canisterId });
-                return #ok();
-            };
-        };
-        return #err("Friend not found with canisterId " # Principal.toText(canisterId));
+        return await* you().reboot_user_removeFriend<system>(caller, canisterId);
     };
 
     public shared ({ caller }) func reboot_user_sendMessage(
         receiver : Principal,
         message : Text,
     ) : async Result<(), MessageError> {
-        assert (caller == owner);
-        // Create the actor reference
-        let friendActor = actor (Principal.toText(receiver)) : actor {
-            reboot_user_receiveMessage : (message : Text) -> async Result<(), MessageError>;
-        };
-        // Attach the cycles to the call (1 billion cycles)
-        Cycles.add<system>(1_000_000_000);
-        // Call the function (handle potential errors)
-        try {
-            return await friendActor.reboot_user_receiveMessage(message);
-        } catch (e) {
-            throw e;
-        };
+        return await* you().reboot_user_sendMessage<system>(caller, receiver, message);
     };
 
     public shared ({ caller }) func reboot_user_receiveMessage(
         message : Text
     ) : async Result<(), MessageError> {
-        // Check if there is enough cycles attached (Fee for Message) and accept them
-        let availableCycles = Cycles.available();
-        let acceptedCycles = Cycles.accept<system>(availableCycles);
-        if (acceptedCycles < 1_000_000_000) {
-            return #err(#NotEnoughCycles);
-        };
-        // Check that the message is not too long
-        if (message.size() > 1024) {
-            return #err(#MessageTooLong);
-        };
-
-        // Check if the caller is already a friend
-        for (friend in friends.vals()) {
-            if (friend.canisterId == caller) {
-                messages := Array.append<(Nat, Name, Text)>(messages, [(messagesId, friend.name, message)]);
-                messagesId += 1;
-                return #ok();
-            };
-        };
-        return #err(#NotAllowed);
+        return await* you().reboot_user_receiveMessage<system>(caller, message);
     };
 
     public shared ({ caller }) func reboot_user_readMessages() : async [(Nat, Name, Text)] {
-        assert (caller == owner);
-        return messages;
+        assert (caller == you().state.owner);
+        return you().state.messages;
     };
 
     public shared ({ caller }) func reboot_user_clearMessage(
         id : Nat
     ) : async Result<(), Text> {
-        assert (caller == owner);
-        for (message in messages.vals()) {
-            if (message.0 == id) {
-                messages := Array.filter<(Nat, Name, Text)>(messages, func(x : (Nat, Name, Text)) { x.0 != id });
-                return #ok();
-            };
-        };
-        return #err("Message not found with id " # Nat.toText(id));
+        return await* you().reboot_user_clearMessage<system>(caller, id);
     };
 
     public shared ({ caller }) func reboot_user_clearAllMessages() : async Result<(), Text> {
-        assert (caller == owner);
-        messages := [];
-        return #ok();
+        return await* you().reboot_user_clearAllMessages<system>(caller);
     };
 
     public query func reboot_user_version() : async (Nat, Nat, Nat) {
-        return version;
+        return you().state.version;
     };
 
     public type HttpRequest = Http.Request;
@@ -275,14 +177,14 @@ shared ({ caller = creator }) actor class UserCanister(
             body = Text.encodeUtf8(
                 "You\n"
                 # "---\n"
-                # "Name: " # name # "\n"
-                # "Owner: " # Principal.toText(owner) # "\n"
-                # "Birth: " # Int.toText(birth) # "\n"
-                # "Alive: " # Bool.toText(alive) # "\n"
-                # "Friends: " # Nat.toText(friends.size()) # "\n"
-                # "Pending requests: " # Nat.toText(friendRequests.size()) # "\n"
-                # "Pending messages: " # Nat.toText(messages.size()) # "\n"
-                # "Version: " # Nat.toText(version.0) # "." # Nat.toText(version.1) # "." # Nat.toText(version.2) # "\n"
+                # "Name: " # you().state.name # "\n"
+                # "Owner: " # Principal.toText(you().state.owner) # "\n"
+                # "Birth: " # Int.toText(you().state.birth) # "\n"
+                # "Alive: " # Bool.toText(you().state.alive) # "\n"
+                # "Friends: " # Nat.toText(you().state.friends.size()) # "\n"
+                # "Pending requests: " # Nat.toText(you().state.friendRequests.size()) # "\n"
+                # "Pending messages: " # Nat.toText(you().state.messages.size()) # "\n"
+                # "Version: " # Nat.toText(you().state.version.0) # "." # Nat.toText(you().state.version.1) # "." # Nat.toText(you().state.version.2) # "\n"
                 # "Cycle Balance: " # Nat.toText(Cycles.balance()) # " cycles " # "(" # Nat.toText(Cycles.balance() / 1_000_000_000_000) # " T" # ")\n"
                 # "Heap size (current): " # Nat.toText(Prim.rts_heap_size()) # " bytes " # "(" # Float.toText(Float.fromInt(Prim.rts_heap_size() / (1024 * 1024))) # " Mb" # ")\n"
                 # "Heap size (max): " # Nat.toText(Prim.rts_max_live_size()) # " bytes " # "(" # Float.toText(Float.fromInt(Prim.rts_max_live_size() / (1024 * 1024))) # " Mb" # ")\n"
@@ -291,6 +193,24 @@ shared ({ caller = creator }) actor class UserCanister(
             headers = [("Content-Type", "text/plain")];
             status_code = 200;
         });
+    };
+
+    system func postupgrade() {
+        you().state := {
+            version = (0, 0, 2);
+            birth = birth;
+            owner = owner;
+            var alive = alive;
+            var name = yourName;
+            var mood = "not set";
+            var latestPing = latestPing;
+            var friendRequestId = friendRequestId;
+            var friendRequests = [];
+            var friends = friends;
+            var messages = [];
+            var messagesId = messagesId;
+        };
+
     };
 
 };
